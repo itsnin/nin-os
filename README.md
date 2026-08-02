@@ -1,1 +1,1 @@
-curl -fsSL https://raw.githubusercontent.com/itsnin/linops/main/scripts/start.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/itsnin/nin-os/main/debloat.sh | sudo bash
