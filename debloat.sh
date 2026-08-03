@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # ubuntu 26.04 server -> vanilla gnome 50 desktop without snap
 
 set -euo pipefail
