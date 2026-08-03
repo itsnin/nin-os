@@ -152,7 +152,7 @@ systemctl enable gdm3
 systemctl set-default graphical.target
 echo "/usr/sbin/gdm3" > /etc/X11/default-display-manager
 
-# 6 extras, no cursor theme is set
+# 6 extras
 echo "==> installing extras (htop wget fonts-noto gnome-boxes micro gnome-shell-extension-manager)"
 apt-get install -y htop wget fonts-noto gnome-boxes micro gnome-shell-extension-manager
 
@@ -191,7 +191,7 @@ apt-get remove -y --purge \
   showtime simple-scan gnome-connections gnome-user-docs \
   yelp orca gnome-software
 
-# 10 remove stray terminals
+# 10 remove stray terminals + cloud-init + snapd
 echo "==> removing stray terminals (alacritty is the only terminal)"
 apt-get remove -y --purge ptyxis 2>/dev/null || true
 apt-get remove -y --purge xterm gnome-terminal 2>/dev/null || true
@@ -207,8 +207,11 @@ else
   echo "snapd is not installed"
 fi
 
-# 11 hold everything unwanted so apt upgrade can never bring it back,
-# apt-mark hold instead of a priority -1 pin, same effect
+# cloud-init is a server provisioning tool, unwanted on a desktop
+echo "==> removing cloud-init"
+apt-get remove -y cloud-init
+
+# 11 hold everything unwanted so apt upgrade can never bring it back
 #
 # do not hold, would break gnome, see 4c:
 #   ubuntu-wallpapers-resolute hard dep of ubuntu-wallpapers
@@ -225,7 +228,7 @@ fi
 #   gsettings-ubuntu-schemas not a hard dep of anything we keep
 #   ptyxis hard dep of gnome-core which we removed, held as
 #     defense-in-depth against a future apt install gnome-core
-#   ghostty xterm gnome-terminal not installed, not deps
+#   xterm gnome-terminal not installed, not deps
 #   all 23 gnome apps from section 9, verified safe above
 echo "==> holding unwanted packages (apt-mark hold)"
 apt-mark hold \
@@ -237,18 +240,14 @@ apt-mark hold \
   ubuntu-session gnome-shell-ubuntu-extensions \
   yaru-theme-gnome-shell yaru-theme-gtk yaru-theme-icon yaru-theme-sound \
   gsettings-ubuntu-schemas \
-  ghostty xterm gnome-terminal ptyxis vim-tiny \
+  xterm gnome-terminal ptyxis vim-tiny \
   2>/dev/null || true
 
-# 12 remove cloud-init
-echo "==> removing cloud-init"
-apt remove cloud-init -y
-
-# 13 clean up orphans, safe since everything wanted is manual (section 4)
+# 12 clean up orphans, safe since everything wanted is manual (section 4)
 echo "==> autoremoving orphans (core is protected by apt-mark manual)"
 apt-get autoremove -y --purge
 
-# 14 final sanity check, catches a broken hold/autoremove before reboot
+# 13 final sanity check, catches a broken hold/autoremove before reboot
 if ! systemctl list-unit-files gdm3.service --all 2>/dev/null | grep -q gdm3; then
   echo "!! warning: gdm3.service is missing, something went wrong"
   echo "!! inspect /var/log/apt/history.log and rerun sections 4-5"
@@ -262,11 +261,11 @@ echo "(no ubuntu session exists). reboot now: sudo reboot"
 echo
 echo "optional gnome apps were removed and held, snap is gone"
 echo "alacritty is the only terminal, networkmanager manages networking"
-echo "no cursor theme was set, standard home folders"
+echo "standard home folders"
 echo "(desktop documents downloads music pictures videos) will be created"
 echo "on first gnome login by xdg-user-dirs-gtk"
 
-# 15 dev toolchain: python c/c++ rust java node.js db clients web
+# 14 dev toolchain: python c/c++ rust java node.js db clients web
 # tooling, placed last after the gdm check and the done banner on
 # purpose. this is a large independent package list under
 # set -euo pipefail, a single bad/unavailable name here would halt the
