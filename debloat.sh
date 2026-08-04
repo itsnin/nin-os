@@ -163,6 +163,44 @@ wget -q -O /tmp/google-chrome-stable.deb https://dl.google.com/linux/direct/goog
 apt-get install -y /tmp/google-chrome-stable.deb || echo "chrome install failed (continuing)"
 rm -f /tmp/google-chrome-stable.deb
 
+echo "==> installing vs code (direct .deb)"
+# same pattern as chrome above. the debconf line below is required or
+# the .deb postinst prompts whether to add microsoft's apt repo, which
+# hangs an unattended script (see code.visualstudio.com/docs/setup/linux)
+echo "code code/add-microsoft-repo boolean true" | debconf-set-selections
+wget -q -O /tmp/vscode-stable.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
+apt-get install -y /tmp/vscode-stable.deb || echo "vs code install failed (continuing)"
+rm -f /tmp/vscode-stable.deb
+
+# github desktop: github's own desktop/desktop repo states linux is
+# not officially supported, so this uses the shiftkey/desktop
+# community fork's apt feed instead, its readme is the source for the
+# key + repo commands below. this is a third-party fork, not github's
+# own build, worth knowing if the feed ever goes stale or changes keys
+echo "==> installing github desktop (shiftkey community fork apt feed)"
+wget -qO- https://apt.packages.shiftkey.dev/gpg.key | gpg --dearmor > /usr/share/keyrings/shiftkey-packages.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/shiftkey-packages.gpg] https://apt.packages.shiftkey.dev/ubuntu/ any main" > /etc/apt/sources.list.d/shiftkey-packages.list
+apt-get update
+apt-get install -y github-desktop || echo "github desktop install failed (continuing)"
+
+# jetbrains toolbox: no apt package, no silent install on linux exists
+# per jetbrains' own docs (jetbrains.com/help/toolbox-app/installation.html)
+# so this stages the tarball and its deps, it does not finish setup.
+# first run of ./bin/jetbrains-toolbox from a graphical session is what
+# creates ~/.local/share/JetBrains/Toolbox and the desktop menu entry,
+# that step has to be done manually once, logged into the desktop.
+# extraction matches jetbrains' own documented command (no strip, the
+# archive's own versioned folder lands inside /opt/jetbrains-toolbox)
+echo "==> staging jetbrains toolbox (manual first launch required)"
+apt-get install -y libxi6 libxrender1 libxtst6 mesa-utils libfontconfig libgtk-3-bin dbus-user-session libxcb-keysyms1
+wget -q -O /tmp/jetbrains-toolbox.tar.gz "https://data.services.jetbrains.com/products/download?platform=linux&code=TBA"
+mkdir -p /opt/jetbrains-toolbox
+tar -xzf /tmp/jetbrains-toolbox.tar.gz -C /opt/jetbrains-toolbox
+rm -f /tmp/jetbrains-toolbox.tar.gz
+if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+  chown -R "$SUDO_USER":"$SUDO_USER" /opt/jetbrains-toolbox
+fi
+
 # 7 free the ~512mb kdump reserves, safe on desktop, kernel
 # metapackages already protected in section 4
 echo "==> removing kdump-tools (frees ~512mb reserved memory)"
@@ -261,6 +299,12 @@ echo "(no ubuntu session exists). reboot now: sudo reboot"
 echo
 echo "optional gnome apps were removed and held, snap is gone"
 echo "alacritty is the only terminal, networkmanager manages networking"
+echo "vs code is installed, run: code"
+echo "github desktop is installed (unofficial shiftkey fork, find it"
+echo "in the app menu or run: github-desktop)"
+echo "jetbrains toolbox is staged but not set up, it needs one manual"
+echo "launch: cd /opt/jetbrains-toolbox/jetbrains-toolbox-*/ && ./bin/jetbrains-toolbox"
+echo "(linux has no silent install for toolbox, this is a jetbrains limit)"
 echo "standard home folders"
 echo "(desktop documents downloads music pictures videos) will be created"
 echo "on first gnome login by xdg-user-dirs-gtk"
