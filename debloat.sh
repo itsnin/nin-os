@@ -172,24 +172,6 @@ wget -q -O /tmp/vscode-stable.deb "https://code.visualstudio.com/sha/download?bu
 apt-get install -y /tmp/vscode-stable.deb || echo "vs code install failed (continuing)"
 rm -f /tmp/vscode-stable.deb
 
-# jetbrains toolbox: no apt package, no silent install on linux exists
-# per jetbrains' own docs (jetbrains.com/help/toolbox-app/installation.html)
-# so this stages the tarball and its deps, it does not finish setup.
-# first run of ./bin/jetbrains-toolbox from a graphical session is what
-# creates ~/.local/share/JetBrains/Toolbox and the desktop menu entry,
-# that step has to be done manually once, logged into the desktop.
-# extraction matches jetbrains' own documented command (no strip, the
-# archive's own versioned folder lands inside /opt/jetbrains-toolbox)
-echo "==> staging jetbrains toolbox (manual first launch required)"
-apt-get install -y libxi6 libxrender1 libxtst6 mesa-utils libfontconfig libgtk-3-bin dbus-user-session libxcb-keysyms1
-wget -q -O /tmp/jetbrains-toolbox.tar.gz "https://data.services.jetbrains.com/products/download?platform=linux&code=TBA"
-mkdir -p /opt/jetbrains-toolbox
-tar -xzf /tmp/jetbrains-toolbox.tar.gz -C /opt/jetbrains-toolbox
-rm -f /tmp/jetbrains-toolbox.tar.gz
-if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
-  chown -R "$SUDO_USER":"$SUDO_USER" /opt/jetbrains-toolbox
-fi
-
 # 7 free the ~512mb kdump reserves, safe on desktop, kernel
 # metapackages already protected in section 4
 echo "==> removing kdump-tools (frees ~512mb reserved memory)"
@@ -289,9 +271,6 @@ echo
 echo "optional gnome apps were removed and held, snap is gone"
 echo "alacritty is the only terminal, networkmanager manages networking"
 echo "vs code is installed, run: code"
-echo "jetbrains toolbox is staged but not set up, it needs one manual"
-echo "launch: cd /opt/jetbrains-toolbox/jetbrains-toolbox-*/ && ./bin/jetbrains-toolbox"
-echo "(linux has no silent install for toolbox, this is a jetbrains limit)"
 echo "standard home folders"
 echo "(desktop documents downloads music pictures videos) will be created"
 echo "on first gnome login by xdg-user-dirs-gtk"
