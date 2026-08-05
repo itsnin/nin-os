@@ -38,21 +38,44 @@ apt-get install -y python3-yaml
 # same interface mid-switch. not related to netplan bug #2042519
 # (that one is about mtu-driven .link units masking networkd after
 # netplan already expects it running, this masks it before the switch)
+#
+# idempotent: each command only runs if the unit isn't already in the
+# target state. on a re-run the units are already masked, so a naive
+# `systemctl stop/mask` would emit "Unit ... is masked." errors (and on
+# some systemd versions return non-zero). the is-active / is-enabled
+# checks below turn every command into a true no-op on the 2nd run.
 echo "==> stopping and masking systemd-networkd (switching to networkmanager)"
-systemctl stop systemd-networkd 2>/dev/null || true
-systemctl mask systemd-networkd 2>/dev/null || true
+# stop only if currently running
+if systemctl is-active --quiet systemd-networkd 2>/dev/null; then
+  systemctl stop systemd-networkd
+fi
+# mask only if not already masked (is-enabled prints "masked" when it is)
+if [ "$(systemctl is-enabled systemd-networkd 2>/dev/null)" != "masked" ]; then
+  systemctl mask systemd-networkd
+fi
 
 # wait-online is a separate unit, still pulled in by network-online.target
-# even with the parent masked
-systemctl disable systemd-networkd-wait-online.service 2>/dev/null || true
-systemctl mask systemd-networkd-wait-online.service 2>/dev/null || true
+# even with the parent masked. only disable/mask if not already masked.
+if [ "$(systemctl is-enabled systemd-networkd-wait-online.service 2>/dev/null)" != "masked" ]; then
+  systemctl disable systemd-networkd-wait-online.service 2>/dev/null || true
+  systemctl mask systemd-networkd-wait-online.service
+fi
 
+# idempotent netplan rewrite: re-run safe. the python loop only marks
+# itself as having changed a file if the renderer actually differs, and
+# netplan apply below is gated on that flag. so a 2nd run with nothing
+# to do is a complete no-op — no network flap, no SSH drop. everything
+# else in this section (apt install, mask networkd, enable networkmanager)
+# is already idempotent on its own.
 # skip *.orig and curtin leftovers from the installer
+NETPLAN_CHANGED=0
 for f in /etc/netplan/*.yaml; do
   case "$f" in
     *.orig|*curtin*) continue ;;
   esac
-  python3 - "$f" <<'PY'
+  # python prints "changed" only when it rewrote the file; that stdout
+  # bumps NETPLAN_CHANGED so we know to reapply
+  if python3 - "$f" <<'PY' | grep -q changed; then NETPLAN_CHANGED=1; fi
 import sys, yaml
 f = sys.argv[1]
 try:
@@ -61,17 +84,23 @@ try:
 except Exception as e:
     print("skip", f, e); sys.exit(0)
 if isinstance(data, dict) and isinstance(data.get('network'), dict):
-    data['network']['renderer'] = 'NetworkManager'
-    with open(f, 'w') as fh:
-        yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
-    print("updated", f)
+    if data['network'].get('renderer') != 'NetworkManager':
+        data['network']['renderer'] = 'NetworkManager'
+        with open(f, 'w') as fh:
+            yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
+        print("changed", f)
+    else:
+        print("already", f)
 PY
 done
 
 # regenerates backend config for the networkmanager renderer, see
-# netplan-generate(8). networkd already stopped/masked above so this
-# hands interfaces over cleanly
-netplan apply
+# netplan-generate(8). only re-applied when a file actually changed,
+# so re-running this script never drops the network on an already-
+# configured system. networkd already stopped/masked above.
+if [ "$NETPLAN_CHANGED" = "1" ]; then
+  netplan apply
+fi
 
 echo "==> enabling networkmanager service"
 systemctl unmask NetworkManager 2>/dev/null || true
@@ -291,16 +320,7 @@ apt-get install -y \
   nodejs \
   sqlite3 postgresql-client mariadb-client pgcli mycli \
   tidy html-xml-utils sassc \
-  ca-certificates gnupg
-
-# rustup not apt (apt lags upstream), run as $SUDO_USER not root or it installs into /root/.cargo
-echo "==> installing rust via rustup"
-if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
-  sudo -u "$SUDO_USER" sh -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
-else
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-fi
-# rustup adds ~/.cargo/bin via shell profile, takes effect next login
-# or after manually sourcing $HOME/.cargo/env, not in this script
+  ca-certificates gnupg \
+  rustc cargo rustfmt rust-clippy
 
 echo "==> development toolchain installed"
