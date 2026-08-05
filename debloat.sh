@@ -11,7 +11,25 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 
-# 0 update + upgrade
+# 0 enable universe, update + upgrade
+#
+# alacritty (section 3, below) lives in universe, not main. server
+# installs don't reliably ship universe enabled - it varies by ISO,
+# installer, and image type (minimal server images can differ from
+# desktop images here). if universe isn't enabled at the moment
+# `apt-get update` builds its index, alacritty simply won't be in
+# that index and the install at section 3 fails outright, killing
+# the whole script under set -e. enabling it here, before the one
+# apt-get update every later install relies on, is required so that
+# index actually contains alacritty.
+# ref https://help.ubuntu.com/community/Repositories/Ubuntu
+echo "==> enabling universe component"
+# add-apt-repository ships in software-properties-common, itself not
+# guaranteed present on a minimal server image - install it first so
+# this doesn't fail on a missing command instead of a missing repo
+apt-get install -y software-properties-common
+add-apt-repository -y universe
+
 echo "==> updating package lists"
 apt-get update
 
