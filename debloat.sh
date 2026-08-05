@@ -172,17 +172,6 @@ wget -q -O /tmp/vscode-stable.deb "https://code.visualstudio.com/sha/download?bu
 apt-get install -y /tmp/vscode-stable.deb || echo "vs code install failed (continuing)"
 rm -f /tmp/vscode-stable.deb
 
-# github desktop: github's own desktop/desktop repo states linux is
-# not officially supported, so this uses the shiftkey/desktop
-# community fork's apt feed instead, its readme is the source for the
-# key + repo commands below. this is a third-party fork, not github's
-# own build, worth knowing if the feed ever goes stale or changes keys
-echo "==> installing github desktop (shiftkey community fork apt feed)"
-wget -qO- https://apt.packages.shiftkey.dev/gpg.key | gpg --dearmor > /usr/share/keyrings/shiftkey-packages.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/shiftkey-packages.gpg] https://apt.packages.shiftkey.dev/ubuntu/ any main" > /etc/apt/sources.list.d/shiftkey-packages.list
-apt-get update
-apt-get install -y github-desktop || echo "github desktop install failed (continuing)"
-
 # jetbrains toolbox: no apt package, no silent install on linux exists
 # per jetbrains' own docs (jetbrains.com/help/toolbox-app/installation.html)
 # so this stages the tarball and its deps, it does not finish setup.
@@ -300,8 +289,6 @@ echo
 echo "optional gnome apps were removed and held, snap is gone"
 echo "alacritty is the only terminal, networkmanager manages networking"
 echo "vs code is installed, run: code"
-echo "github desktop is installed (unofficial shiftkey fork, find it"
-echo "in the app menu or run: github-desktop)"
 echo "jetbrains toolbox is staged but not set up, it needs one manual"
 echo "launch: cd /opt/jetbrains-toolbox/jetbrains-toolbox-*/ && ./bin/jetbrains-toolbox"
 echo "(linux has no silent install for toolbox, this is a jetbrains limit)"
